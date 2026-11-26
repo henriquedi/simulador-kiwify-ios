@@ -1,0 +1,51 @@
+name: Gerar IPA Kiwify
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Capacitor e gerar projeto iOS
+        run: |
+          npm install
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Aplicar ícone personalizado
+        run: |
+          sips -s format png -z 1024 1024 icon.* --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+      - name: Compilar aplicativo sem assinatura
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Empacotar em arquivo .ipa
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r Simulador-Kiwify.ipa Payload
+
+      - name: Disponibilizar .ipa para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Simulador-Kiwify-IPA
+          path: Simulador-Kiwify.ipa
